@@ -12,37 +12,32 @@ const PuraTaza = () => {
   useEffect(() => {
     if (!ready) return;
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-      } catch (error) {
-        console.error('Error al acceder a la cámara:', error);
+    const startCamera = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
-    }
+    };
 
-    async function initObjectron() {
+    const initObjectron = async () => {
       if (!window.Objectron) {
-        console.error('Objectron no está disponible. Asegúrate de que el script se haya cargado correctamente.');
+        console.error('Objectron no está disponible.');
         return;
       }
 
       objectronRef.current = new window.Objectron({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/objectron/${file}`
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/objectron/${file}`,
       });
 
       objectronRef.current.setOptions({
-        modelName: 'Cup',
-        maxNumObjects: 1,
-        minDetectionConfidence: 0.3,
-        minTrackingConfidence: 0.99
+        modelName: 'Cup',          // Modelo: Cup
+        maxNumObjects: 1,           // Detecta solo 1 objeto
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.99,
       });
-      console.log('✅ Modelo configurado como Cup');
 
-      objectronRef.current.onResults(onResults);
+      objectronRef.current.onResults(drawResults);
 
       await startCamera();
 
@@ -54,56 +49,61 @@ const PuraTaza = () => {
       };
 
       sendToObjectron();
-    }
+    };
 
-    function onResults(results) {
-      if (!canvasRef.current || !videoRef.current) return;
-
+    const drawResults = (results) => {
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) return;
 
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+      canvas.width = results.image.width;
+      canvas.height = results.image.height;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
 
-      if (results.detectedObjects && results.detectedObjects.length > 0) {
-        console.log(`✅ ¡Objeto detectado! Se detectaron ${results.detectedObjects.length} objeto(s).`);
-        for (const detectedObject of results.detectedObjects) {
-          drawBox(ctx, detectedObject.landmarks_2d);
-        }
-      } else {
-        console.log('❌ No se detectó ningún objeto.');
+      if (results.objectDetections?.length) {
+        results.objectDetections.forEach(obj => {
+          ctx.strokeStyle = 'lime';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          obj.keypoints.forEach((kp, index) => {
+            const x = kp.point2d.x * canvas.width;
+            const y = kp.point2d.y * canvas.height;
+            if (index === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.closePath();
+          ctx.stroke();
+        });
       }
-    }
-
-    function drawBox(ctx, landmarks) {
-      ctx.strokeStyle = 'lime';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (const landmark of landmarks) {
-        ctx.lineTo(landmark.x * canvasRef.current.width, landmark.y * canvasRef.current.height);
-      }
-      ctx.closePath();
-      ctx.stroke();
-    }
+    };
 
     initObjectron();
   }, [ready]);
 
   return (
-    <div style={{ position: 'relative' }}>
-      {/* Carga el script de Objectron */}
+    <div>
+      {/* Cargar MediaPipe Objectron desde CDN */}
       <Script
         src="https://cdn.jsdelivr.net/npm/@mediapipe/objectron/objectron.js"
         strategy="afterInteractive"
         onLoad={() => setReady(true)}
       />
-      {/* Video oculto */}
-      <video ref={videoRef} style={{ display: 'none' }} playsInline></video>
-      {/* Canvas para dibujar detecciones */}
-      <canvas ref={canvasRef} style={{ width: '100%', height: 'auto' }} />
+
+      {/* Video de entrada */}
+      <video
+        ref={videoRef}
+        style={{ width: '100%', display: 'none' }} // Oculto para solo ver el canvas
+        playsInline
+        muted
+      />
+
+      {/* Canvas para mostrar los resultados */}
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: 'auto', border: '1px solid lime' }}
+      />
     </div>
   );
 };
