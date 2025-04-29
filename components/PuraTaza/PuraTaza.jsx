@@ -84,7 +84,7 @@ const PuraTaza = () => {
 
 
 
-          drawBox(ctx, points2D);  
+          drawBox(ctx, points2D);
           drawPointNumbers(ctx, points2D); // ✅ Números de puntos en el canvas
 
           // Mostrar confianza
@@ -163,13 +163,12 @@ const PuraTaza = () => {
         style={{
           marginTop: '1rem',
           padding: '10px',
-          border: '1px solid #ccc',
-          borderRadius: '8px',
+          borderBottom: '2px solid lime',
+          
         }}
       >
-        <h4>Objetos detectados</h4>
         {detections.length === 0 ? (
-          <p>⏳ Buscando objetos...</p>
+          <p className='text-white'>⏳🫡☕ Buscando tazas...</p>
         ) : (
           detections.map((det, index) => (
             <div key={index} style={{ marginBottom: '8px' }}>
