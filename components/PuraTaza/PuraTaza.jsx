@@ -11,25 +11,29 @@ const PuraTaza = () => {
   const [detections, setDetections] = useState([]);
 
   const BOX_CONNECTIONS = [
-    [0, 1], [1, 2], [2, 3], [3, 0],
-    [4, 5], [5, 6], [6, 7], [7, 4],
-    [0, 4], [1, 5], [2, 6], [3, 7],
+    [0, 1], [1, 5], [5, 4], [4, 0],
+    [2, 3], [3, 7], [7, 6], [6, 2],
+    [0, 2], [1, 3], [5, 7], [4, 6],
   ];
 
   useEffect(() => {
     if (!ready) return;
 
     const startCamera = async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } catch (err) {
+        console.error('❌ Error iniciando la cámara:', err);
       }
     };
 
     const initObjectron = async () => {
       if (!window.Objectron) {
-        console.error('Objectron no está disponible.');
+        console.error('Objectron no disponible.');
         return;
       }
 
@@ -41,8 +45,8 @@ const PuraTaza = () => {
         modelName: 'Cup',
         maxNumObjects: 2,
         selfieMode: false,
-        minDetectionConfidence: 0.2,
-        minTrackingConfidence: 0.5,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.8,
       });
 
       objectronRef.current.onResults(drawResults);
@@ -63,6 +67,8 @@ const PuraTaza = () => {
       const ctx = canvas?.getContext('2d');
       if (!canvas || !ctx) return;
 
+      if (results.image.width === 0 || results.image.height === 0) return;
+
       canvas.width = results.image.width;
       canvas.height = results.image.height;
 
@@ -72,12 +78,16 @@ const PuraTaza = () => {
       const newDetections = [];
 
       if (results.objectDetections?.length) {
+        console.log(results.objectDetections); // ✅ Puntos 2D en la consola
         results.objectDetections.forEach(obj => {
           const points2D = obj.keypoints.map(k => k.point2d);
-          drawBox(ctx, points2D);
-          drawAxes(ctx, points2D);
 
-          // ✅ Mostrar confianza en canvas
+
+
+          drawBox(ctx, points2D);  
+          drawPointNumbers(ctx, points2D); // ✅ Números de puntos en el canvas
+
+          // Mostrar confianza
           const cx = points2D[0].x * canvas.width;
           const cy = points2D[0].y * canvas.height - 10;
           const vis = (obj.visibility * 100).toFixed(1) + '%';
@@ -94,8 +104,12 @@ const PuraTaza = () => {
 
       setDetections(newDetections);
     };
-
     const drawBox = (ctx, landmarks) => {
+      const BOX_CONNECTIONS = [
+        [1, 2], [2, 4], [4, 3], [3, 1], // Trasero
+        [5, 6], [6, 8], [8, 7], [7, 5], // Delantero
+        [1, 5], [2, 6], [3, 7], [4, 8], // Laterales
+      ];
       ctx.strokeStyle = 'lime';
       ctx.lineWidth = 2;
       for (const [startIdx, endIdx] of BOX_CONNECTIONS) {
@@ -112,34 +126,14 @@ const PuraTaza = () => {
       }
     };
 
-    const drawAxes = (ctx, landmarks) => {
-      const CENTER = 0;
-      const xEnd = midpoint(landmarks[1], landmarks[2]); // Eje X (derecha)
-      const yEnd = midpoint(landmarks[3], landmarks[2]); // Eje Y (arriba)
-      const zEnd = midpoint(landmarks[0], landmarks[4]); // Eje Z (profundidad)
-
-      drawArrow(ctx, landmarks[CENTER], xEnd, 'red');   // X
-      drawArrow(ctx, landmarks[CENTER], yEnd, 'green'); // Y
-      drawArrow(ctx, landmarks[CENTER], zEnd, 'blue');  // Z
-    };
-
-    const midpoint = (a, b) => ({
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2,
-    });
-
-    const drawArrow = (ctx, from, to, color) => {
-      const x1 = from.x * canvasRef.current.width;
-      const y1 = from.y * canvasRef.current.height;
-      const x2 = to.x * canvasRef.current.width;
-      const y2 = to.y * canvasRef.current.height;
-
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+    const drawPointNumbers = (ctx, landmarks) => {
+      ctx.fillStyle = 'white';
+      ctx.font = '10px sans-serif';
+      landmarks.forEach((pt, idx) => {
+        const x = pt.x * canvasRef.current.width;
+        const y = pt.y * canvasRef.current.height;
+        ctx.fillText(idx.toString(), x + 5, y - 5);
+      });
     };
 
     initObjectron();
@@ -165,7 +159,14 @@ const PuraTaza = () => {
         style={{ width: '100%', height: 'auto', border: '1px solid lime' }}
       />
 
-      <div style={{ marginTop: '1rem', padding: '10px', border: '1px solid #ccc', borderRadius: '8px' }}>
+      <div
+        style={{
+          marginTop: '1rem',
+          padding: '10px',
+          border: '1px solid #ccc',
+          borderRadius: '8px',
+        }}
+      >
         <h4>Objetos detectados</h4>
         {detections.length === 0 ? (
           <p>⏳ Buscando objetos...</p>
@@ -173,7 +174,11 @@ const PuraTaza = () => {
           detections.map((det, index) => (
             <div key={index} style={{ marginBottom: '8px' }}>
               <strong>Objeto #{det.id}</strong> — Confianza:
-              <span style={{ color: det.visibility > 0.8 ? 'green' : 'orange' }}>
+              <span
+                style={{
+                  color: det.visibility > 0.8 ? 'green' : 'orange',
+                }}
+              >
                 {' '}{(det.visibility * 100).toFixed(1)}%
               </span>
             </div>
