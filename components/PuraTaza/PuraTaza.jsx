@@ -8,6 +8,13 @@ const PuraTaza = () => {
   const canvasRef = useRef(null);
   const objectronRef = useRef(null);
   const [ready, setReady] = useState(false);
+  const [detections, setDetections] = useState([]);
+
+  const BOX_CONNECTIONS = [
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    [0, 4], [1, 5], [2, 6], [3, 7],
+  ];
 
   useEffect(() => {
     if (!ready) return;
@@ -31,14 +38,14 @@ const PuraTaza = () => {
       });
 
       objectronRef.current.setOptions({
-        modelName: 'Cup',          // Modelo: Cup
-        maxNumObjects: 1,           // Detecta solo 1 objeto
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.99,
+        modelName: 'Cup',
+        maxNumObjects: 2,
+        selfieMode: false,
+        minDetectionConfidence: 0.2,
+        minTrackingConfidence: 0.5,
       });
 
       objectronRef.current.onResults(drawResults);
-
       await startCamera();
 
       const sendToObjectron = async () => {
@@ -62,21 +69,77 @@ const PuraTaza = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
 
+      const newDetections = [];
+
       if (results.objectDetections?.length) {
         results.objectDetections.forEach(obj => {
-          ctx.strokeStyle = 'lime';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          obj.keypoints.forEach((kp, index) => {
-            const x = kp.point2d.x * canvas.width;
-            const y = kp.point2d.y * canvas.height;
-            if (index === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+          const points2D = obj.keypoints.map(k => k.point2d);
+          drawBox(ctx, points2D);
+          drawAxes(ctx, points2D);
+
+          // ✅ Mostrar confianza en canvas
+          const cx = points2D[0].x * canvas.width;
+          const cy = points2D[0].y * canvas.height - 10;
+          const vis = (obj.visibility * 100).toFixed(1) + '%';
+          ctx.fillStyle = obj.visibility > 0.8 ? 'green' : 'orange';
+          ctx.font = '14px sans-serif';
+          ctx.fillText(`Confianza: ${vis}`, cx, cy);
+
+          newDetections.push({
+            id: obj.id,
+            visibility: obj.visibility,
           });
-          ctx.closePath();
-          ctx.stroke();
         });
       }
+
+      setDetections(newDetections);
+    };
+
+    const drawBox = (ctx, landmarks) => {
+      ctx.strokeStyle = 'lime';
+      ctx.lineWidth = 2;
+      for (const [startIdx, endIdx] of BOX_CONNECTIONS) {
+        const start = landmarks[startIdx];
+        const end = landmarks[endIdx];
+        const x1 = start.x * canvasRef.current.width;
+        const y1 = start.y * canvasRef.current.height;
+        const x2 = end.x * canvasRef.current.width;
+        const y2 = end.y * canvasRef.current.height;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+    };
+
+    const drawAxes = (ctx, landmarks) => {
+      const CENTER = 0;
+      const xEnd = midpoint(landmarks[1], landmarks[2]); // Eje X (derecha)
+      const yEnd = midpoint(landmarks[3], landmarks[2]); // Eje Y (arriba)
+      const zEnd = midpoint(landmarks[0], landmarks[4]); // Eje Z (profundidad)
+
+      drawArrow(ctx, landmarks[CENTER], xEnd, 'red');   // X
+      drawArrow(ctx, landmarks[CENTER], yEnd, 'green'); // Y
+      drawArrow(ctx, landmarks[CENTER], zEnd, 'blue');  // Z
+    };
+
+    const midpoint = (a, b) => ({
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+    });
+
+    const drawArrow = (ctx, from, to, color) => {
+      const x1 = from.x * canvasRef.current.width;
+      const y1 = from.y * canvasRef.current.height;
+      const x2 = to.x * canvasRef.current.width;
+      const y2 = to.y * canvasRef.current.height;
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
     };
 
     initObjectron();
@@ -84,26 +147,39 @@ const PuraTaza = () => {
 
   return (
     <div>
-      {/* Cargar MediaPipe Objectron desde CDN */}
       <Script
         src="https://cdn.jsdelivr.net/npm/@mediapipe/objectron/objectron.js"
         strategy="afterInteractive"
         onLoad={() => setReady(true)}
       />
 
-      {/* Video de entrada */}
       <video
         ref={videoRef}
-        style={{ width: '100%', display: 'none' }} // Oculto para solo ver el canvas
+        style={{ width: '100%', display: 'none' }}
         playsInline
         muted
       />
 
-      {/* Canvas para mostrar los resultados */}
       <canvas
         ref={canvasRef}
         style={{ width: '100%', height: 'auto', border: '1px solid lime' }}
       />
+
+      <div style={{ marginTop: '1rem', padding: '10px', border: '1px solid #ccc', borderRadius: '8px' }}>
+        <h4>Objetos detectados</h4>
+        {detections.length === 0 ? (
+          <p>⏳ Buscando objetos...</p>
+        ) : (
+          detections.map((det, index) => (
+            <div key={index} style={{ marginBottom: '8px' }}>
+              <strong>Objeto #{det.id}</strong> — Confianza:
+              <span style={{ color: det.visibility > 0.8 ? 'green' : 'orange' }}>
+                {' '}{(det.visibility * 100).toFixed(1)}%
+              </span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
