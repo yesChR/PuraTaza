@@ -10,18 +10,19 @@ const PuraTaza = () => {
   const [ready, setReady] = useState(false);
   const [detections, setDetections] = useState([]);
 
-  const BOX_CONNECTIONS = [
-    [0, 1], [1, 5], [5, 4], [4, 0],
-    [2, 3], [3, 7], [7, 6], [6, 2],
-    [0, 2], [1, 3], [5, 7], [4, 6],
-  ];
-
   useEffect(() => {
     if (!ready) return;
 
     const startCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+        const stream = await navigator.mediaDevices.getUserMedia(
+          {
+            video: {
+              width: 1280,
+              height: 720,
+              facingMode: { ideal: 'environment' },
+            },
+          });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
@@ -45,8 +46,8 @@ const PuraTaza = () => {
         modelName: 'Cup',
         maxNumObjects: 2,
         selfieMode: false,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.7,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.4,
       });
 
       objectronRef.current.onResults(drawResults);
@@ -81,26 +82,18 @@ const PuraTaza = () => {
         console.log("Aqui entra", results.objectDetections); // ✅ Puntos 2D en la consola
         results.objectDetections.forEach(obj => {
           const points2D = obj.keypoints.map(k => k.point2d);
-          drawBox(ctx, points2D);
-          drawPointNumbers(ctx, points2D); // ✅ Números de puntos en el canvas
-
-          // Mostrar confianza
-          const cx = points2D[0].x * canvas.width;
-          const cy = points2D[0].y * canvas.height - 10;
-          const vis = (obj.visibility * 100).toFixed(1) + '%';
-          ctx.fillStyle = obj.visibility > 0.8 ? 'green' : 'orange';
-          ctx.font = '14px sans-serif';
-          ctx.fillText(`Confianza: ${vis}`, cx, cy);
+          drawBox(ctx, points2D); // Dibujar el cubo
+          drawPointNumbers(ctx, points2D); // Dibujar números de puntos en el canvas
 
           newDetections.push({
             id: obj.id,
-            visibility: obj.visibility,
           });
         });
       }
 
       setDetections(newDetections);
     };
+
     const drawBox = (ctx, landmarks) => {
       const BOX_CONNECTIONS = [
         [1, 2], [2, 4], [4, 3], [3, 1], // Trasero
@@ -108,7 +101,7 @@ const PuraTaza = () => {
         [1, 5], [2, 6], [3, 7], [4, 8], // Laterales
       ];
       ctx.strokeStyle = 'lime';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 4; // Grosor del trazo más ancho
       for (const [startIdx, endIdx] of BOX_CONNECTIONS) {
         const start = landmarks[startIdx];
         const end = landmarks[endIdx];
@@ -125,7 +118,7 @@ const PuraTaza = () => {
 
     const drawPointNumbers = (ctx, landmarks) => {
       ctx.fillStyle = 'white';
-      ctx.font = '10px sans-serif';
+      ctx.font = '20px sans-serif';
       landmarks.forEach((pt, idx) => {
         const x = pt.x * canvasRef.current.width;
         const y = pt.y * canvasRef.current.height;
@@ -135,6 +128,36 @@ const PuraTaza = () => {
 
     initObjectron();
   }, [ready]);
+
+  useEffect(() => {
+    const updateCanvasStyle = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      if (window.innerWidth <= 480) {
+        // Pantallas muy pequeñas
+        canvas.style.aspectRatio = '11 / 16';
+        canvas.style.maxHeight = '400px';
+        canvas.style.maxWidth = '600px';
+      } else if (window.innerWidth <= 768) {
+        // Pantallas pequeñas
+        canvas.style.aspectRatio = '9 / 16';
+        canvas.style.maxHeight = '400px';
+      } else {
+        // Pantallas grandes
+        canvas.style.aspectRatio = '16 / 9';
+        canvas.style.maxHeight = '500px';
+      }
+    };
+
+    // Ejecutar al cargar y al redimensionar la ventana
+    updateCanvasStyle();
+    window.addEventListener('resize', updateCanvasStyle);
+
+    return () => {
+      window.removeEventListener('resize', updateCanvasStyle);
+    };
+  }, []);
 
   return (
     <div>
@@ -153,7 +176,13 @@ const PuraTaza = () => {
 
       <canvas
         ref={canvasRef}
-        style={{ width: '100%', height: 'auto', border: '1px solid lime' }}
+        style={{
+          width: '100%',
+          height: 'auto',
+          border: '1px solid lime',
+          aspectRatio: '1 / 1', // Mantener proporción 16:9
+          maxHeight: '700px', // Limitar la altura máxima
+        }}
       />
 
       <div
@@ -168,7 +197,7 @@ const PuraTaza = () => {
         {detections.length === 0 ? (
           <p className='text-white'>⏳🫡☕ Buscando tazas...</p>
         ) : (
-          <p className='text-white'>Detectada</p>
+          <p className='text-white'>Detectada☕💯👍</p>
         )}
       </div>
     </div>

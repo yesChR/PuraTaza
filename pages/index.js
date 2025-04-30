@@ -17,27 +17,29 @@ export default function Home() {
     <main
       className="flex flex-col items-center justify-center min-h-screen bg-cover bg-center"
       style={{
-        backgroundImage: "url('/fondo3.png')", 
+        backgroundImage: "url('/fondo3.png')",
         backgroundRepeat: "no-repeat",
-        backgroundPosition: "center", 
+        backgroundPosition: "center",
       }}
     >
       {/* Logo circular */}
-      <Image
-        src="/logo.jpeg" 
-        alt="Logo de Pura Taza"
-        width={196} 
-        height={250}
-        priority 
-        className="rounded-full border-5 shadow-2xl " 
-      />
+      <div className="flex justify-center items-center mt-6 w-32 h-32 md:w-60 md:h-60 rounded-full border-4 shadow-2xl bg-white">
+        <Image
+          src="/logo.jpeg"
+          alt="Logo de Pura Taza"
+          width={240}
+          height={240}
+          priority
+          className="rounded-full object-cover"
+        />
+      </div>
       {/* Título */}
       <h1
         className={`${geistSans.className} text-4xl font-bold text-center`}
         style={{
-          color: "#4B3621", 
-          textShadow: "2px 2px 4px rgba(75, 54, 33, 0.8)", 
-          WebkitTextStroke: "1px #D2B48C", 
+          color: "#4B3621",
+          textShadow: "2px 2px 4px rgba(75, 54, 33, 0.8)",
+          WebkitTextStroke: "1px #D2B48C",
         }}
       >
         PuraTaza
