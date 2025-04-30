@@ -15,30 +15,29 @@ const geistMono = Geist_Mono({
 export default function Home() {
   return (
     <main
-      className="flex flex-col items-center justify-center min-h-screen bg-cover bg-center p-4"
+      className="flex flex-col items-center justify-center min-h-screen bg-cover bg-center"
       style={{
-        backgroundImage: "url('/fondo3.png')", // Cambia 'fondo3.png' por el nombre de tu imagen
-        backgroundSize: "cover", // Asegura que la imagen cubra toda la pantalla
-        backgroundRepeat: "no-repeat", // Evita que la imagen se repita
-        backgroundPosition: "center", // Centra la imagen
+        backgroundImage: "url('/fondo3.png')", 
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center", 
       }}
     >
       {/* Logo circular */}
       <Image
-        src="/logo.jpeg" // Asegúrate de que el archivo esté en la carpeta "public"
+        src="/logo.jpeg" 
         alt="Logo de Pura Taza"
-        width={196} // Tamaño más grande
+        width={196} 
         height={250}
-        priority // Agregado para optimizar el LCP
-        className="rounded-full border-5 shadow-2xl " // Clase para hacerlo circular y agregar borde
+        priority 
+        className="rounded-full border-5 shadow-2xl " 
       />
       {/* Título */}
       <h1
         className={`${geistSans.className} text-4xl font-bold text-center`}
         style={{
-          color: "#4B3621", // Color café oscuro
-          textShadow: "2px 2px 4px rgba(75, 54, 33, 0.8)", // Sombra café
-          WebkitTextStroke: "1px #D2B48C", // Borde de texto color café claro
+          color: "#4B3621", 
+          textShadow: "2px 2px 4px rgba(75, 54, 33, 0.8)", 
+          WebkitTextStroke: "1px #D2B48C", 
         }}
       >
         PuraTaza
