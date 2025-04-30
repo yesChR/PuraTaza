@@ -21,7 +21,7 @@ const PuraTaza = () => {
 
     const startCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
@@ -45,8 +45,8 @@ const PuraTaza = () => {
         modelName: 'Cup',
         maxNumObjects: 2,
         selfieMode: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.8,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.7,
       });
 
       objectronRef.current.onResults(drawResults);
@@ -78,12 +78,9 @@ const PuraTaza = () => {
       const newDetections = [];
 
       if (results.objectDetections?.length) {
-        console.log(results.objectDetections); // ✅ Puntos 2D en la consola
+        console.log("Aqui entra", results.objectDetections); // ✅ Puntos 2D en la consola
         results.objectDetections.forEach(obj => {
           const points2D = obj.keypoints.map(k => k.point2d);
-
-
-
           drawBox(ctx, points2D);
           drawPointNumbers(ctx, points2D); // ✅ Números de puntos en el canvas
 
@@ -164,24 +161,14 @@ const PuraTaza = () => {
           marginTop: '1rem',
           padding: '10px',
           borderBottom: '2px solid lime',
-          
+          height: '55px', // Altura fija
+          overflowY: 'auto', // Habilitar desplazamiento si el contenido excede la altura
         }}
       >
         {detections.length === 0 ? (
           <p className='text-white'>⏳🫡☕ Buscando tazas...</p>
         ) : (
-          detections.map((det, index) => (
-            <div key={index} style={{ marginBottom: '8px' }}>
-              <strong>Objeto #{det.id}</strong> — Confianza:
-              <span
-                style={{
-                  color: det.visibility > 0.8 ? 'green' : 'orange',
-                }}
-              >
-                {' '}{(det.visibility * 100).toFixed(1)}%
-              </span>
-            </div>
-          ))
+          <p className='text-white'>Detectada</p>
         )}
       </div>
     </div>
