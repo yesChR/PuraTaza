@@ -46,7 +46,7 @@ export default function Home() {
       </h1>
       {/* Cámara */}
       <div className="w-full flex justify-center items-center">
-        <div className="lg:w-lg lg:max-w-1/3 p-2 rounded-lg shadow-2xl mb-30 sm:w-full sm:max-w-xs">
+        <div className="md:w-3/4 md:max-w-3xl md:p-8 rounded-lg shadow-2xl mb-10 w-full p-4">
           <PuraTaza />
         </div>
       </div>

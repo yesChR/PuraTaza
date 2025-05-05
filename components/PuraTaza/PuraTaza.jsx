@@ -136,8 +136,8 @@ const PuraTaza = () => {
 
       if (window.innerWidth <= 480) {
         // Pantallas muy pequeñas
-        canvas.style.aspectRatio = '11 / 16';
-        canvas.style.maxHeight = '400px';
+        canvas.style.aspectRatio = '10 / 15';
+        canvas.style.maxHeight = '375px';
         canvas.style.maxWidth = '600px';
       } else if (window.innerWidth <= 768) {
         // Pantallas pequeñas
