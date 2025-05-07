@@ -7,9 +7,10 @@ const PuraTaza = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const objectronRef = useRef(null);
-  const animationRef = useRef(null); // <- Controla el loop de detección
+  const animationRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [cameraUnavailable, setCameraUnavailable] = useState(true);
   const [detections, setDetections] = useState([]);
 
   const stopCamera = () => {
@@ -19,7 +20,9 @@ const PuraTaza = () => {
       videoRef.current.srcObject = null;
     }
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    animationRef.current = null;
     setDetections([]);
+    setCameraUnavailable(true); // Mostrar ícono de cámara apagada
   };
 
   const drawBox = (ctx, landmarks) => {
@@ -61,7 +64,6 @@ const PuraTaza = () => {
 
     canvas.width = results.image.width;
     canvas.height = results.image.height;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
 
@@ -76,6 +78,7 @@ const PuraTaza = () => {
     }
 
     setDetections(newDetections);
+    setCameraUnavailable(false); // Ocultar ícono si hubo detección
   };
 
   const startCamera = async () => {
@@ -93,43 +96,67 @@ const PuraTaza = () => {
       }
     } catch (err) {
       console.error('❌ Error iniciando la cámara:', err);
+      setCameraUnavailable(true);
     }
   };
 
-  const initObjectron = async () => {
-    if (!window.Objectron) {
-      console.error('Objectron no disponible.');
-      return;
-    }
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !objectronRef.current) return;
 
-    objectronRef.current = new window.Objectron({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/objectron/${file}`,
-    });
+    if (cameraOn) setCameraOn(false);
 
-    objectronRef.current.setOptions({
-      modelName: 'Cup',
-      maxNumObjects: 2,
-      selfieMode: false,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.4,
-    });
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const imgElement = document.getElementById('inputImage');
+      imgElement.src = e.target.result;
 
-    objectronRef.current.onResults(drawResults);
-    await startCamera();
+      imgElement.onload = async () => {
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (!canvas || !ctx) return;
 
-    const sendToObjectron = async () => {
-      if (objectronRef.current && videoRef.current) {
-        await objectronRef.current.send({ image: videoRef.current });
-      }
-      animationRef.current = requestAnimationFrame(sendToObjectron);
+        canvas.width = imgElement.naturalWidth;
+        canvas.height = imgElement.naturalHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+
+        await objectronRef.current.send({ image: imgElement });
+      };
     };
 
-    sendToObjectron();
+    reader.readAsDataURL(file);
   };
 
   useEffect(() => {
-    if (ready && cameraOn) {
-      initObjectron();
+    if (!ready) return;
+
+    if (!objectronRef.current && window.Objectron) {
+      objectronRef.current = new window.Objectron({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/objectron/${file}`,
+      });
+
+      objectronRef.current.setOptions({
+        modelName: 'Cup',
+        maxNumObjects: 2,
+        selfieMode: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.4,
+      });
+
+      objectronRef.current.onResults(drawResults);
+    }
+
+    if (cameraOn) {
+      startCamera().then(() => {
+        const sendToObjectron = async () => {
+          if (objectronRef.current && videoRef.current) {
+            await objectronRef.current.send({ image: videoRef.current });
+          }
+          animationRef.current = requestAnimationFrame(sendToObjectron);
+        };
+        sendToObjectron();
+      });
     } else {
       stopCamera();
     }
@@ -166,21 +193,56 @@ const PuraTaza = () => {
         onLoad={() => setReady(true)}
       />
 
-      <button
-        onClick={() => setCameraOn(prev => !prev)}
-        style={{
-          margin: '10px',
-          padding: '10px 20px',
-          fontSize: '16px',
-          background: cameraOn ? 'darkred' : 'darkgreen',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          cursor: 'pointer',
-        }}
-      >
-        {cameraOn ? '🛑 Apagar cámara' : '📷 Encender cámara'}
-      </button>
+      {/* Botones */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '10px' }}>
+        <button
+          onClick={() => setCameraOn(prev => !prev)}
+          style={{
+            padding: '10px 20px',
+            fontSize: '16px',
+            background: cameraOn ? 'darkred' : 'darkgreen',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+          }}
+        >
+          {cameraOn ? '🛑 Apagar cámara' : '🎥 Encender cámara'}
+        </button>
+
+        <label
+          htmlFor="upload"
+          style={{
+            backgroundColor: 'darkblue',
+            color: 'white',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '16px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+          }}
+        >
+          📷 Subir foto
+          <input
+            type="file"
+            id="upload"
+            accept="image/*"
+            onChange={handleImageUpload}
+            style={{ display: 'none' }}
+          />
+        </label>
+      </div>
+
+      <img
+        id="inputImage"
+        style={{ display: 'none' }}
+        alt="uploaded"
+        crossOrigin="anonymous"
+      />
 
       <video
         ref={videoRef}
@@ -189,16 +251,43 @@ const PuraTaza = () => {
         muted
       />
 
-      <canvas
-        ref={canvasRef}
-        style={{
-          width: '100%',
-          height: 'auto',
-          border: '1px solid lime',
-          aspectRatio: '1 / 1',
-          maxHeight: '700px',
-        }}
-      />
+      {/* Canvas con fondo gris e ícono */}
+      <div style={{ position: 'relative' }}>
+        {cameraUnavailable && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              maxHeight: '700px',
+              backgroundColor: 'gray',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 2,
+            }}
+          >
+            <img
+              src="/camara.png"
+              alt="Cámara bloqueada"
+              style={{ width: '80px', opacity: 0.5 }}
+            />
+          </div>
+        )}
+        <canvas
+          ref={canvasRef}
+          style={{
+            width: '100%',
+            height: 'auto',
+            border: '1px solid lime',
+            aspectRatio: '1 / 1',
+            maxHeight: '700px',
+            zIndex: 1,
+          }}
+        />
+      </div>
 
       <div
         style={{
