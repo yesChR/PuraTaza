@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 const Objectron = (ready) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const objectronRef = useRef(null);
+  const objectronRef = useRef(null); 
   const animationRef = useRef(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraUnavailable, setCameraUnavailable] = useState(true);
@@ -78,6 +78,7 @@ const Objectron = (ready) => {
     if (!ready) return;
 
     if (!objectronRef.current && window.Objectron) {
+
       objectronRef.current = new window.Objectron({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/objectron/${file}`,
       });
@@ -91,21 +92,23 @@ const Objectron = (ready) => {
       });
 
       objectronRef.current.onResults((results) => {
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
+        const canvas = canvasRef.current;//nos traemos el canvas
+        const ctx = canvas?.getContext('2d');//ctx es el contexto del canvas(obtiene coordenadas del canva)
         if (!canvas || !ctx || results.image.width === 0) return;
 
         canvas.width = results.image.width;
         canvas.height = results.image.height;
+        //limpiar el canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
 
+        //dibuja los puntos de referencia
         const newDetections = [];
         if (results.objectDetections?.length) {
           results.objectDetections.forEach(obj => {
             const points2D = obj.keypoints.map(k => k.point2d);
-            drawBox(ctx, points2D);
-            drawPointNumbers(ctx, points2D);
+            drawBox(ctx, points2D);//dibuja la caja
+            drawPointNumbers(ctx, points2D);//coloca los números
             newDetections.push({ id: obj.id });
           });
         }
@@ -115,13 +118,14 @@ const Objectron = (ready) => {
       });
     }
 
+      //para enviar el video al objectron
     if (cameraOn) {
       startCamera().then(() => {
         const sendToObjectron = async () => {
           if (objectronRef.current && videoRef.current) {
             await objectronRef.current.send({ image: videoRef.current });
           }
-          animationRef.current = requestAnimationFrame(sendToObjectron);
+          animationRef.current = requestAnimationFrame(sendToObjectron);//propia del video
         };
         sendToObjectron();
       });
@@ -157,12 +161,16 @@ const Objectron = (ready) => {
     ctx.strokeStyle = 'lime';
     ctx.lineWidth = 4;
     for (const [startIdx, endIdx] of BOX_CONNECTIONS) {
-      const start = landmarks[startIdx];
-      const end = landmarks[endIdx];
+      //en start tenemos las coordenadas de los puntos
+      const start = landmarks[startIdx];//punto donde se inicia la línea
+      const end = landmarks[endIdx];//punto donde termina la línea
+
+      // Convertir las coordenadas normalizadas a píxeles
       const x1 = start.x * canvasRef.current.width;
       const y1 = start.y * canvasRef.current.height;
       const x2 = end.x * canvasRef.current.width;
       const y2 = end.y * canvasRef.current.height;
+      //realiza el trazo
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
@@ -173,6 +181,7 @@ const Objectron = (ready) => {
   const drawPointNumbers = (ctx, landmarks) => {
     ctx.fillStyle = 'white';
     ctx.font = '20px sans-serif';
+    //idx es el # del punto
     landmarks.forEach((pt, idx) => {
       const x = pt.x * canvasRef.current.width;
       const y = pt.y * canvasRef.current.height;
